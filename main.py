@@ -49,10 +49,10 @@ def main():
             rebuild_replication()
 
         elif choice == '5':
-            create_roles()
+            disable_subscription()
 
         elif choice == '6':
-            create_permissions()
+            enable_subscription()
 
         elif choice == '7':
             insert_data()
@@ -96,12 +96,6 @@ def rep_status():
     print(get_status())
 
 
-def run_update():
-
-
-
-
-
 # REPLICATION MENU FUNCTIONS
 def get_status():
     # Gets the replication status
@@ -128,9 +122,6 @@ def rebuild_subscriptions():
 
 
 def check_replication():
-    script = "2-DATABASE simplicity_v2.0_create_db_types.sql"
-    result = script + ' completed successfully.'
-    source = 'Function: create_types()'
 
     try:
         with psycopg2.connect(conn_string) as conn:
@@ -161,32 +152,26 @@ def rebuild_replication():
     create_subscriptions()
 
 
-def disable_subscription():
+def disable_subscription(ip: str):
+    # get db connection
+    db = database.get_db(ip)
 
-    try:
-        with psycopg2.connect(conn_string) as conn:
-            with conn.cursor() as curs:
-                curs.execute(open(db_script_path + script, "r").read())
-    except Exception as err:
-        etype = 'Error'
-        event_log(err, etype, source)
-    else:
-        etype = 'Information'
-        event_log(result, etype, source)
+    for i in db:
+        data = i.execute("""SELECT * FROM replication_disable_simplicity_subscriptions() """).fetchall()
+
+        return data
 
 
 def enable_subscription():
+    # get db connection
+    db_primary = database.get_db(primary_ip)
+    db_secondary = database.get_db(secondary_ip)
 
-    try:
-        with psycopg2.connect(conn_string) as conn:
-            with conn.cursor() as curs:
-                curs.execute(open(db_script_path + script, "r").read())
-    except Exception as err:
-        etype = 'Error'
-        event_log(err, etype, source)
-    else:
-        etype = 'Information'
-        event_log(result, etype, source)
+    # try:
+    for i in db_primary:
+        data = i.execute("""SELECT * FROM replication_enable_simplicity_subscriptions() """).fetchall()
+
+        return data
 
 
 # HELPER FUNCTIONS

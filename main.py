@@ -22,14 +22,15 @@ servers = [
 ]
 
 
-
-primary_ip      = '192.168.1.122'
-secondary_ip    = '192.168.1.123'
-
-
 def main():
     choice = 0
     working = 'Working...'
+
+    primary_ip      = get_local_ip()
+    remote_ip       =
+
+    primary_ip      = '192.168.1.122'
+    secondary_ip    = '192.168.1.123'
 
     print(menu())
 
@@ -241,15 +242,13 @@ def initialize_replication(in_primary_ip: str, in_secondary_ip: str):
                          (in_primary_ip, in_secondary_ip)).fetchall()
 
 
-def get_local_values():
+def get_local_ip():
 
-    # get local ip
+    # get the hostname
+    hostname = socket.gethostname()
 
-
-    # get local hostname
-    res_host = socket.gethostname()
-    res_host, res_alias, res_ip = socket.gethostbyaddr('127.0.0.1')
-    print(res_host)
+    # get the ip address
+    return socket.gethostbyname(hostname)
 
 
 

@@ -2,6 +2,7 @@ import socket
 import database
 
 
+# Known servers
 servers = [
     {
         "prod1": "192.168.1.122",
@@ -26,11 +27,8 @@ def main():
     choice = 0
     working = 'Working...'
 
-    primary_ip      = get_local_ip()
-    remote_ip       =
-
-    primary_ip      = '192.168.1.122'
-    secondary_ip    = '192.168.1.123'
+    local_ip      = '192.168.1.122'
+    remote_ip     = '192.168.1.123'
 
     print(menu())
 
@@ -41,18 +39,26 @@ def main():
             rep_status()
 
         elif choice == '2':
+            # rebuilds subscriptions on BOTH servers
             rebuild_subscriptions()
 
         elif choice == '3':
             create_tables()
 
         elif choice == '4':
+            # rebuilds replication on BOTH servers by:
+            #   dropping subscriptions
+            #   removing replication
+            #   initializing replication
+            #   creating subscriptions
             rebuild_replication()
 
         elif choice == '5':
+            # disables subscription on local server ONLY
             disable_subscription()
 
         elif choice == '6':
+            # enables subscription on local server ONLY
             enable_subscription()
 
         elif choice == '7':
@@ -66,7 +72,17 @@ def main():
             run_update()
 
         elif choice == '10':
-            get_local_values()
+            lip=(get_local_ip())
+            print(lip)
+
+            # TEST DATA
+            lip = '172.16.34.121'
+
+            print(get_remote_ip(lip))
+
+            local_ip      = get_local_ip()
+            if local_ip:
+                remote_ip       = get_remote_ip(local_ip)
 
 
 def menu():
@@ -102,7 +118,7 @@ def get_status():
     # Gets the replication status
 
     # get db connection
-    db_local = database.get_db(primary_ip)
+    db_local = database.get_db(local_ip)
 
     for i in db_local:
         data = i.execute("""SELECT * FROM replication_check_status() """).fetchall()
@@ -125,15 +141,11 @@ def rebuild_subscriptions():
 def check_replication():
 
     try:
-        with psycopg2.connect(conn_string) as conn:
-            with conn.cursor() as curs:
-                curs.execute(open(db_script_path + script, "r").read())
+        pass
     except Exception as err:
-        etype = 'Error'
-        event_log(err, etype, source)
+        pass
     else:
-        etype = 'Information'
-        event_log(result, etype, source)
+        pass
 
 
 def rebuild_replication():
@@ -153,39 +165,38 @@ def rebuild_replication():
     create_subscriptions()
 
 
-def disable_subscription(ip: str):
+def disable_subscription(local_ip: str):
     # get db connection
-    db = database.get_db(ip)
+    db_local = database.get_db(local_ip)
 
-    for i in db:
+    for i in db_local:
         data = i.execute("""SELECT * FROM replication_disable_simplicity_subscriptions() """).fetchall()
 
         return data
 
 
-def enable_subscription():
+def enable_subscription(local_ip: str):
     # get db connection
-    db_primary = database.get_db(primary_ip)
-    db_secondary = database.get_db(secondary_ip)
+    db_local = database.get_db(local_ip)
 
     # try:
-    for i in db_primary:
+    for i in db_local:
         data = i.execute("""SELECT * FROM replication_enable_simplicity_subscriptions() """).fetchall()
 
         return data
 
 
 # HELPER FUNCTIONS
-def drop_subscriptions():
+def drop_subscriptions(local_ip: str, remote_ip: str):
     # get db connection
-    db_primary = database.get_db(primary_ip)
-    db_secondary = database.get_db(secondary_ip)
+    db_local = database.get_db(local_ip)
+    db_remote = database.get_db(remote_ip)
 
     # try:
-    for i in db_primary:
+    for i in db_local:
         data = i.execute("""SELECT * FROM replication_drop_simplicity_subscriptions() """).fetchall()
 
-    for i in db_secondary:
+    for i in db_remote:
         data = i.execute("""SELECT * FROM replication_drop_simplicity_subscriptions() """).fetchall()
 
     return data
@@ -193,14 +204,14 @@ def drop_subscriptions():
 
 def create_subscriptions():
     # get db connection
-    db_primary = database.get_db(primary_ip)
-    db_secondary = database.get_db(secondary_ip)
+    db_local = database.get_db(primary_ip)
+    db_remote = database.get_db(secondary_ip)
 
     # try:
-    for i in db_primary:
+    for i in db_local:
         data = i.execute("""SELECT * FROM replication_create_simplicity_subscriptions() """).fetchall()
 
-    for i in db_secondary:
+    for i in db_remote:
         data = i.execute("""SELECT * FROM replication_create_simplicity_subscriptions() """).fetchall()
 
     return data
@@ -212,15 +223,15 @@ def remove_replication():
     # TODO Ensure there are no subscriptions first
 
     # get db connection
-    db_primary = database.get_db(primary_ip)
-    db_secondary = database.get_db(secondary_ip)
+    db_local = database.get_db(primary_ip)
+    db_remote = database.get_db(secondary_ip)
 
     # remove replication
-    for i in db_primary:
+    for i in db_local:
         data = i.execute("""SELECT * FROM replication_remove() """).fetchall()
 
     # remove replication
-    for i in db_secondary:
+    for i in db_remote:
         data = i.execute("""SELECT * FROM replication_remove() """).fetchall()
 
 
@@ -228,27 +239,46 @@ def initialize_replication(in_primary_ip: str, in_secondary_ip: str):
     # TODO figure out input parameters and check system_locals
 
     # get db connection
-    db_primary = database.get_db(primary_ip)
-    db_secondary = database.get_db(secondary_ip)
+    db_local = database.get_db(primary_ip)
+    db_remote = database.get_db(secondary_ip)
 
     # remove replication
-    for i in db_primary:
+    for i in db_local:
         data = i.execute("""SELECT * FROM replication_config_init(%,%) """,
                          (in_primary_ip, in_secondary_ip)).fetchall()
 
     # remove replication
-    for i in db_secondary:
+    for i in db_remote:
         data = i.execute("""SELECT * FROM replication_config_init() """,
                          (in_primary_ip, in_secondary_ip)).fetchall()
 
 
 def get_local_ip():
+    # get the local ip address
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # Connect to machine accessible to all
+    s.connect(("172.16.51.253", 80))
+    lip = s.getsockname()[0]
+    s.close()
 
-    # get the hostname
-    hostname = socket.gethostname()
+    return lip
 
-    # get the ip address
-    return socket.gethostbyname(hostname)
+
+def get_remote_ip(local_ip):
+    # get the remote ip address
+    # NOTE - THIS IS NOT THE SECONDARY IP, IT'S SIMPLY THE OTHER SERVER'S IP.
+    print(local_ip)
+    # get db connection
+    db = database.get_db(local_ip)
+
+    for i in db:
+        # TODO MAKE A SQL FUNCTION INSTEAD OF THE ADHOC QUERY HERE.
+        # TODO MAKE FUNCTION GET OTHER IP BUT ALSO MAKE SURE IT CONTAINS THE LOCAL_IP
+        data = i.execute("""SELECT host FROM system_replication sr WHERE sr.host != (%s) """,
+                         (local_ip,)).fetchall()
+        data = res = [ sub['host'] for sub in data ]
+
+    return data[0]
 
 
 

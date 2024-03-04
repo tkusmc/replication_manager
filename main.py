@@ -27,8 +27,12 @@ def main():
     choice = 0
     working = 'Working...'
 
-    local_ip      = '192.168.1.122'
-    remote_ip     = '192.168.1.123'
+    ip = {
+        "local_ip": "192.168.1.122",
+        "remote_ip": "192.168.1.123",
+        "primary_ip": "",
+        "secondary_ip": ""
+    }
 
     print(menu())
 
@@ -43,7 +47,7 @@ def main():
             rebuild_subscriptions()
 
         elif choice == '3':
-            create_tables()
+            pass
 
         elif choice == '4':
             # rebuilds replication on BOTH servers by:
@@ -62,27 +66,21 @@ def main():
             enable_subscription()
 
         elif choice == '7':
-            insert_data()
+            pass
 
         elif choice == '8':
             display_message(working)
-            run_e164()
+            pass
 
         elif choice == '9':
-            run_update()
+            pass
 
         elif choice == '10':
-            lip=(get_local_ip())
-            print(lip)
 
-            # TEST DATA
-            lip = '172.16.34.121'
 
-            print(get_remote_ip(lip))
-
-            local_ip      = get_local_ip()
-            if local_ip:
-                remote_ip       = get_remote_ip(local_ip)
+            ip["local_ip"] = get_local_ip()
+            if ip.get["local_ip"]
+                ip["remote_ip"] = get_remote_ip(ip.get["local_ip"])
 
 
 def menu():
@@ -114,7 +112,7 @@ def rep_status():
 
 
 # REPLICATION MENU FUNCTIONS
-def get_status():
+def get_status(local_ip: str):
     # Gets the replication status
 
     # get db connection
@@ -202,10 +200,10 @@ def drop_subscriptions(local_ip: str, remote_ip: str):
     return data
 
 
-def create_subscriptions():
+def create_subscriptions(local_ip: str, remote_ip: str):
     # get db connection
-    db_local = database.get_db(primary_ip)
-    db_remote = database.get_db(secondary_ip)
+    db_local = database.get_db(local_ip)
+    db_remote = database.get_db(remote_ip)
 
     # try:
     for i in db_local:
@@ -217,14 +215,14 @@ def create_subscriptions():
     return data
 
 
-def remove_replication():
+def remove_replication(local_ip: str, remote_ip: str):
     # Make sure subscriptions are dropped first.
 
     # TODO Ensure there are no subscriptions first
 
     # get db connection
-    db_local = database.get_db(primary_ip)
-    db_remote = database.get_db(secondary_ip)
+    db_local = database.get_db(local_ip)
+    db_remote = database.get_db(remote_ip)
 
     # remove replication
     for i in db_local:
@@ -235,7 +233,7 @@ def remove_replication():
         data = i.execute("""SELECT * FROM replication_remove() """).fetchall()
 
 
-def initialize_replication(in_primary_ip: str, in_secondary_ip: str):
+def initialize_replication(primary_ip: str, secondary_ip: str):
     # TODO figure out input parameters and check system_locals
 
     # get db connection
@@ -245,12 +243,12 @@ def initialize_replication(in_primary_ip: str, in_secondary_ip: str):
     # remove replication
     for i in db_local:
         data = i.execute("""SELECT * FROM replication_config_init(%,%) """,
-                         (in_primary_ip, in_secondary_ip)).fetchall()
+                         (primary_ip, secondary_ip)).fetchall()
 
     # remove replication
     for i in db_remote:
         data = i.execute("""SELECT * FROM replication_config_init() """,
-                         (in_primary_ip, in_secondary_ip)).fetchall()
+                         (primary_ip, secondary_ip)).fetchall()
 
 
 def get_local_ip():
@@ -267,7 +265,6 @@ def get_local_ip():
 def get_remote_ip(local_ip):
     # get the remote ip address
     # NOTE - THIS IS NOT THE SECONDARY IP, IT'S SIMPLY THE OTHER SERVER'S IP.
-    print(local_ip)
     # get db connection
     db = database.get_db(local_ip)
 
@@ -280,6 +277,35 @@ def get_remote_ip(local_ip):
 
     return data[0]
 
+
+def get_primary_ip(local_ip):
+    # get the primary and secondary ip addresses
+    # get db connection
+    db = database.get_db(local_ip)
+
+    for i in db:
+        # TODO MAKE A SQL FUNCTION INSTEAD OF THE ADHOC QUERY HERE.
+        # TODO MAKE FUNCTION ENSURE TABLE CONTAINS THE LOCAL_IP, THEN GET THE PRIMARY
+        data = i.execute("""SELECT host FROM system_replication sr WHERE sr.host = (%s) """,
+                         ('primary',)).fetchone()
+        data = res = [ sub['host'] for sub in data ]
+
+    return data[0]
+
+
+def get_secondary_ip(local_ip):
+    # get the primary and secondary ip addresses
+    # get db connection
+    db = database.get_db(local_ip)
+
+    for i in db:
+        # TODO MAKE A SQL FUNCTION INSTEAD OF THE ADHOC QUERY HERE.
+        # TODO MAKE FUNCTION ENSURE TABLE CONTAINS THE LOCAL_IP, THEN GET THE SECONDARY
+        data = i.execute("""SELECT host FROM system_replication sr WHERE sr.host = (%s) """,
+                         ('secondary',)).fetchone()
+        data = res = [ sub['host'] for sub in data ]
+
+    return data[0]
 
 
 if __name__ == "__main__":
